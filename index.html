@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Interface</title>
+    <style>
+      body {
+        background: #343541;
+        color: #ececf1;
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .chat-container {
+        background: #444654;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        width: 750px;
+        padding: 24px 20px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        height: 500px;
+      }
+      .chat-history {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-bottom: 8px;
+      }
+      .message-row {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-end;
+      }
+      .message.user {
+        background: #19c37d;
+        color: #fff;
+        align-self: flex-end;
+        right: 0;
+        border-bottom-right-radius: 0;
+      }
+      .message.bot {
+        background: #353740;
+        color: #ececf1;
+        align-self: flex-start;
+        border-bottom-left-radius: 0;
+      }
+      .message {
+        max-width: 75%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 1em;
+        white-space: pre-wrap;
+        margin: 0 0 0 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+      }
+      form {
+        display: flex;
+        gap: 8px;
+      }
+      input#message {
+        flex: 1;
+        padding: 10px;
+        border-radius: 6px;
+        border: none;
+        background: #343541;
+        color: #ececf1;
+        font-size: 1em;
+        outline: none;
+      }
+      button[type="submit"] {
+        background: #19c37d;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 0 18px;
+        font-size: 1em;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      button[type="submit"]:hover {
+        background: #15a06b;
+      }
+      .loading-bubbles {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: 2px;
+      }
+      .bubble {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: #19c37d;
+        border-radius: 50%;
+        opacity: 0.7;
+        animation: bubble-bounce 1s infinite alternate;
+      }
+      .bubble:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .bubble:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes bubble-bounce {
+        0% {
+          transform: translateY(0);
+          opacity: 0.7;
+        }
+        100% {
+          transform: translateY(-8px);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-history" id="chat_history"></div>
+      <form onsubmit="chat(event)">
+        <input id="message" name="message" autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+      const chatHistory = document.getElementById("chat_history");
+
+      function appendMessage(text, sender, isMarkdown = false) {
+        const row = document.createElement("div");
+        row.className = "message-row";
+        const msg = document.createElement("div");
+        msg.className = "message " + sender;
+        if (isMarkdown) {
+          msg.innerHTML = marked.parse(text);
+        } else {
+          msg.innerText = text;
+        }
+        row.appendChild(msg);
+        chatHistory.appendChild(row);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      function showLoadingBubbles() {
+        const row = document.createElement("div");
+        row.className = "message-row";
+        row.id = "loading_row";
+        const bubbles = document.createElement("div");
+        bubbles.className = "message bot";
+        bubbles.innerHTML = `
+                    <span class="loading-bubbles">
+                        <span class="bubble"></span>
+                        <span class="bubble"></span>
+                        <span class="bubble"></span>
+                    </span>
+                `;
+        row.appendChild(bubbles);
+        chatHistory.appendChild(row);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      function removeLoadingBubbles() {
+        const loadingRow = document.getElementById("loading_row");
+        if (loadingRow) loadingRow.remove();
+      }
+
+      async function chat(e) {
+        e.preventDefault();
+        const input = document.getElementById("message");
+        const msg = input.value.trim();
+        if (!msg) return;
+        appendMessage(msg, "user");
+        input.value = "";
+        showLoadingBubbles();
+
+        try {
+          const response = await fetch("http://127.0.0.1:8000/api/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: msg }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          removeLoadingBubbles();
+          appendMessage(data.message || data, "bot", true);
+        } catch (error) {
+          removeLoadingBubbles();
+          appendMessage("Error fetching response", "bot");
+        }
+      }
+    </script>
+  </body>
+</html>
